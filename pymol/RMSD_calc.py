@@ -79,12 +79,12 @@ def _build_atom_map(dock_coords, dock_elems, crys_coords, crys_elems):
     return atom_map
 
 
-def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
+def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1, title_states=1):
     """
     Calculate heavy-atom RMSD of Vina docking poses vs a crystal ligand.
 
     USAGE:
-        vina_rmsd pdbqt_file, ligand_resn [, pdb_file [, chain [, show]]]
+        vina_rmsd pdbqt_file, ligand_resn [, pdb_file [, chain [, show [, title_states]]]]
 
     ARGUMENTS:
         pdbqt_file  = Vina output PDBQT file with multiple poses
@@ -94,6 +94,7 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
                       current session (e.g. as part of an already-loaded receptor).
         chain       = chain containing the crystal ligand (default: A)
         show        = 1 to update visualization, 0 to suppress (default: 1)
+        title_states= 1 to set per-state titles with RMSD values (default: 1)
 
     NOTES:
         - RMSD is a pure placement RMSD — no fitting is performed. Vina output
@@ -111,8 +112,10 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
         # Reference from a ligand already in the session (e.g. inside the receptor):
         vina_rmsd imatinib_docked.pdbqt, STI, chain=B
         vina_rmsd imatinib_docked.pdbqt, STI
+        vina_rmsd imatinib_docked.pdbqt, STI, chain=B, title_states=1
     """
     show = bool(int(show))
+    title_states = bool(int(title_states))
 
     print("=== RMSD Calculation: Vina Poses vs Crystal Structure ===\n")
 
@@ -210,6 +213,7 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
     print("=== Heavy-Atom RMSD Results ===")
     print(f"  {'Pose':>4}   {'RMSD (Å)':>10}")
     print("  " + "-" * 20)
+    rmsd_by_state = {}
     for s in range(1, n_poses + 1):
         model = cmd.get_model(f"{vina_obj} and not hydrogen", state=s)
         coords = np.array([a.coord for a in model.atom])
@@ -217,7 +221,16 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
             print(f"  {s:4d}   {'shape mismatch':>10}")
             continue
         rmsd = np.sqrt(np.mean(np.sum((coords - crystal_reordered) ** 2, axis=1)))
+        rmsd_by_state[s] = rmsd
         print(f"  {s:4d}   {rmsd:10.3f}")
+
+    if title_states:
+        for s in range(1, n_poses + 1):
+            if s in rmsd_by_state:
+                cmd.set_title(vina_obj, s, f"Pose {s} | RMSD {rmsd_by_state[s]:.3f} Å")
+            else:
+                cmd.set_title(vina_obj, s, f"Pose {s} | RMSD n/a")
+        print("\nState titles updated with RMSD values.")
 
     # --- Visualization (additive — nothing is hidden or removed) ---
     if show:
@@ -225,14 +238,14 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1):
             cmd.show("cartoon", f"{pdb_obj} and polymer")
         cmd.show("sticks", "crystal_lig")
         cmd.color("forest", "crystal_lig")
-        cmd.set("all_states", 1, vina_obj)
+        cmd.set("all_states", 0, vina_obj)
         cmd.show("sticks", vina_obj)
-        cmd.set("stick_transparency", 0.6, vina_obj)
+        cmd.set("stick_transparency", 0.0, vina_obj)
         cmd.color("gray70", vina_obj)
         cmd.zoom("crystal_lig", 5)
         cmd.center("crystal_lig")
         print("\nGreen sticks = Crystal ligand (reference)")
-        print("Gray transparent sticks = All docked poses")
+        print("Gray sticks = Docked pose (current state)")
 
 
 cmd.extend("vina_rmsd", vina_rmsd)
