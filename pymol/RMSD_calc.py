@@ -227,9 +227,9 @@ def vina_rmsd(pdbqt_file, ligand_resn, pdb_file=None, chain="A", show=1, title_s
     if title_states:
         for s in range(1, n_poses + 1):
             if s in rmsd_by_state:
-                cmd.set_title(vina_obj, s, f"Pose {s} | RMSD {rmsd_by_state[s]:.3f} Å")
+                cmd.set_title(vina_obj, s, f"{rmsd_by_state[s]:.3f}")
             else:
-                cmd.set_title(vina_obj, s, f"Pose {s} | RMSD n/a")
+                cmd.set_title(vina_obj, s, "n/a")
         print("\nState titles updated with RMSD values.")
 
     # --- Visualization (additive — nothing is hidden or removed) ---
